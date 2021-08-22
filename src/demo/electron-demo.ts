@@ -6,7 +6,7 @@ app.disableHardwareAcceleration()
 
 let window: BrowserWindow
 
-function createWindow () {
+function createWindow() {
   window = new BrowserWindow({
     width: 400,
     height: 300,
@@ -17,45 +17,37 @@ function createWindow () {
   })
 
   window.loadURL(`data:text/html;charset=utf-8,
-    <head>
-      <title>overlay-demo</title>
-    </head>
-    <body style="padding: 0; margin: 0;">
-      <div style="position: absolute; width: 100%; height: 100%; border: 4px solid red; background: rgba(255,255,255,0.1); box-sizing: border-box; pointer-events: none;"></div>
-      <div style="padding-top: 50vh; text-align: center;">
-        <div style="padding: 16px; border-radius: 8px; background: rgb(255,255,255); border: 4px solid red; display: inline-block;">
-          <span>Overlay Window</span>
-          <span id="text1"></span>
-          <br><span><b>CmdOrCtrl + Q</b> to toggle setIgnoreMouseEvents</span>
-          <br><span><b>CmdOrCtrl + H</b> to "hide" overlay using CSS</span>
-        </div>
-      </div>
-      <script>
-        const electron = require('electron');
-
-        electron.ipcRenderer.on('focus-change', (e, state) => {
-          document.getElementById('text1').textContent = (state) ? ' (overlay is clickable) ' : 'clicks go through overlay'
-        });
-
-        electron.ipcRenderer.on('visibility-change', (e, state) => {
-          if (document.body.style.display) {
-            document.body.style.display = null
-          } else {
-            document.body.style.display = 'none'
-          }
-        });
-      </script>
-    </body>
-  `)
+  <head>
+  <title>overlay-demo</title>
+  <style>
+  </style>
+</head>
+<body style="padding: 0; margin: 0;">
+<div style="position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.2); box-sizing: border-box; pointer-events: none;"></div>
+  <div style="padding-top: 10vh; padding-left: 0vh; text-align: top; font-family: sans-serif; color: Violet">
+    <div style="padding: 16px; background: rgba(0,0,0,0.8); border: 0px solid black; display: inline-block;">
+      <span id="text1">AAAAAAAAAAAAAAAAA</span>
+    </div>
+  </div>
+  </div>
+  <script>
+    const electron = require('electron');
+    electron.ipcRenderer.on('message', (e, msg) => {
+      document.getElementById('text1').textContent = msg
+    });
+    </script>
+</body>
+`)
 
   // NOTE: if you close Dev Tools overlay window will lose transparency 
-  window.webContents.openDevTools({ mode: 'detach', activate: false })
-
+  window.webContents.openDevTools({ mode: 'detach', activate: true })
   window.setIgnoreMouseEvents(true)
-
+  window.on("close", () => { 
+     overlayWindow.stop(); 
+  });
   makeDemoInteractive()
-
-  overlayWindow.attachTo(window, 'Untitled - Notepad')
+  //overlayWindow.attachTo(window, 'Sem título - Bloco de Notas')
+  overlayWindow.start(window, 'Sem título - Bloco de Notas')
 }
 
 function makeDemoInteractive () {
@@ -76,10 +68,10 @@ function makeDemoInteractive () {
   }
 
   globalShortcut.register('CmdOrCtrl + Q', toggleOverlayState)
-
-  globalShortcut.register('CmdOrCtrl + H', () => {
-    window.webContents.send('visibility-change', false)
-  })
+  globalShortcut.register('CmdOrCtrl + H', () => { window.webContents.send('visibility-change', false) })
+  globalShortcut.register('CmdOrCtrl + I', () => { console.log("Close"); window.close() })
+  globalShortcut.register('CmdOrCtrl + U', () => { console.log("Stop"); overlayWindow.stop() })
+  globalShortcut.register('CmdOrCtrl + K', () => { console.log("Start"); overlayWindow.start(window, 'Sem título - Bloco de Notas') })
 }
 
 app.on('ready', () => {

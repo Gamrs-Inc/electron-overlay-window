@@ -12,6 +12,7 @@ interface AddonExports {
     cb: (e: any) => void
   ): void
 
+  stop(): void;
   activateOverlay(): void
   focusTarget(): void
 }
@@ -47,7 +48,7 @@ export interface MoveresizeEvent {
 
 declare interface OverlayWindow {
   on(event: 'attach', listener: (e: AttachEvent) => void): this
-  on(event: 'focus', listener: () => void): this
+  on(event: 'focus', listener: () => void): this  
   on(event: 'blur', listener: () => void): this
   on(event: 'detach', listener: () => void): this
   on(event: 'fullscreen', listener: (e: FullscreenEvent) => void): this
@@ -55,9 +56,13 @@ declare interface OverlayWindow {
 }
 
 class OverlayWindow extends EventEmitter {
-  private _overlayWindow!: BrowserWindow
-  public defaultBehavior = true
+  private _overlayWindow: BrowserWindow | undefined;
+  private _targetWindowTitle?: string;
+  private initialized: boolean = false;
+  public  defaultBehavior = true
   private lastBounds: Rectangle = { x: 0, y: 0, width: 0, height: 0 }
+  private hidden = true;
+  private active = false;
 
   readonly WINDOW_OPTS = {
     fullscreenable: true,
@@ -75,9 +80,9 @@ class OverlayWindow extends EventEmitter {
     this.on('attach', (e) => {
       if (this.defaultBehavior) {
         // linux: important to show window first before changing fullscreen
-        this._overlayWindow.showInactive()
+        this._overlayWindow?.showInactive()
         if (e.isFullscreen !== undefined) {
-          this._overlayWindow.setFullScreen(e.isFullscreen)
+          this._overlayWindow!.setFullScreen(e.isFullscreen)
         }
         this.lastBounds = e
         this.updateOverlayBounds()
@@ -86,13 +91,13 @@ class OverlayWindow extends EventEmitter {
 
     this.on('fullscreen', (e) => {
       if (this.defaultBehavior) {
-        this._overlayWindow.setFullScreen(e.isFullscreen)
+        this._overlayWindow?.setFullScreen(e.isFullscreen)
       }
     })
 
     this.on('detach', () => {
       if (this.defaultBehavior) {
-        this._overlayWindow.hide()
+        this._overlayWindow?.hide()
       }
     })
 
@@ -108,14 +113,14 @@ class OverlayWindow extends EventEmitter {
     let lastBounds = this.lastBounds
     if (lastBounds.width != 0 && lastBounds.height != 0) {
       if (process.platform === 'win32') {
-        lastBounds = screen.screenToDipRect(this._overlayWindow, this.lastBounds)
+        lastBounds = screen.screenToDipRect(this._overlayWindow!, this.lastBounds)
       }
-      this._overlayWindow.setBounds(lastBounds)
+      this._overlayWindow!.setBounds(lastBounds)
       if (process.platform === 'win32') {
         // if moved to screen with different DPI, 2nd call to setBounds will correctly resize window
         // dipRect must be recalculated as well
-        lastBounds = screen.screenToDipRect(this._overlayWindow, this.lastBounds)
-        this._overlayWindow.setBounds(lastBounds)
+        lastBounds = screen.screenToDipRect(this._overlayWindow!, this.lastBounds)
+        this._overlayWindow!.setBounds(lastBounds)
       }
     }
   }
@@ -150,7 +155,7 @@ class OverlayWindow extends EventEmitter {
       //         - also crashes if using .moveTop()
       lib.activateOverlay()
     } else {
-      this._overlayWindow.focus()
+      this._overlayWindow?.focus()
     }
   }
 
@@ -158,12 +163,44 @@ class OverlayWindow extends EventEmitter {
     lib.focusTarget()
   }
 
-  attachTo (overlayWindow: BrowserWindow, targetWindowTitle: string) {
-    if (this._overlayWindow) {
-      throw new Error('Library can be initialized only once.')
-    }
+  stop() {
+    lib.stop();
+    this._overlayWindow?.hide()
+    this._overlayWindow = undefined;
+    this._targetWindowTitle = "";
+    this.initialized = false;
+  }
+
+  start(overlayWindow: BrowserWindow, targetWindowTitle: string) {
     this._overlayWindow = overlayWindow
-    lib.start(overlayWindow.getNativeWindowHandle(), targetWindowTitle, this.handler.bind(this))
+    this._targetWindowTitle = targetWindowTitle
+    if (this._overlayWindow == undefined) {
+      return;
+    }
+    if (this._targetWindowTitle == undefined) {
+      return;
+    }
+    if (this._targetWindowTitle.length <= 0) {
+      return;
+    }
+    this.hidden = false;
+    if (!this.initialized) {
+      console.log('showing window..');
+      this.initialized = true;
+      lib.start(this._overlayWindow.getNativeWindowHandle(), this._targetWindowTitle, this.handler.bind(this));
+    }
+    if (this.active) {
+    //  this._overlayWindow?.showInactive();
+      this.activateOverlay();
+    }
+  }
+
+  attachTo(overlayWindow: BrowserWindow, targetWindowTitle: string) {
+    // if (this._targetWindowTitle == "" || this._overlayWindow === undefined) {
+    //   throw new Error('Library can be initialized only once.')
+    // }
+    this._overlayWindow = overlayWindow
+    this._targetWindowTitle = targetWindowTitle
   }
 }
 
